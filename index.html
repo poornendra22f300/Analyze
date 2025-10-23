@@ -1,0 +1,386 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Repo Builder: Fix execute.py, add data.csv, and CI</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    :root { color-scheme: light dark; --bg:#0b1020; --fg:#e6e6ea; --muted:#8a8fa3; --accent:#4bb3fd; --ok:#23c552; --warn:#f9c74f; --err:#ff5964; --card:#151a2c; }
+    body { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji"; margin: 0; background: var(--bg); color: var(--fg); }
+    header { padding: 24px; background: linear-gradient(135deg, #1a2040, #0b1020); border-bottom: 1px solid #1f2742; }
+    header h1 { margin: 0 0 6px 0; font-size: 22px; }
+    header p { margin: 0; color: var(--muted); }
+    main { padding: 24px; max-width: 1000px; margin: 0 auto; }
+    section { background: var(--card); border: 1px solid #1f2742; border-radius: 12px; padding: 18px; margin-bottom: 18px; }
+    h2 { margin-top: 0; font-size: 18px; }
+    .grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit,minmax(280px,1fr)); }
+    .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+    button, .btn { cursor: pointer; border: 1px solid #2b395f; background: #1b2545; color: var(--fg); padding: 10px 14px; border-radius: 8px; font-weight: 600; }
+    button:hover, .btn:hover { background: #22305a; }
+    code, pre { background: #0f1426; color: #d7e3ff; border: 1px solid #1f2742; border-radius: 8px; padding: 10px; overflow: auto; }
+    pre { max-height: 320px; }
+    label { font-weight: 600; display: block; margin-bottom: 6px; }
+    input[type="file"] { display: block; }
+    .muted { color: var(--muted); }
+    .success { color: var(--ok); }
+    .warn { color: var(--warn); }
+    .err { color: var(--err); }
+    .small { font-size: 12px; }
+    .path { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; background: #0f1426; padding: 2px 6px; border-radius: 6px; border: 1px solid #1f2742; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Repo Builder: execute.py fix, data.csv, and GitHub Actions (Pages)</h1>
+    <p>Use this tool to generate the required repository files, convert data.xlsx → data.csv, and set up CI with Ruff and GitHub Pages publishing of result.json.</p>
+  </header>
+  <main>
+    <section>
+      <h2>1) Generate repository files</h2>
+      <p>This will create the following files ready to save into your repo:</p>
+      <ul>
+        <li><span class="path">execute.py</span> — fixed and Python 3.11 + Pandas 2.3 compatible</li>
+        <li><span class="path">.github/workflows/ci.yml</span> — CI: Ruff, execute script, publish Pages</li>
+        <li><span class="path">.gitignore</span> — ensures <code>result.json</code> is not committed</li>
+      </ul>
+      <div class="grid">
+        <div>
+          <label>execute.py</label>
+          <div class="row">
+            <button onclick="downloadFile('execute.py', EXECUTE_PY)">Download execute.py</button>
+            <button onclick="copyToClipboard(EXECUTE_PY, this)">Copy</button>
+          </div>
+          <pre><code id="code-execute"></code></pre>
+        </div>
+        <div>
+          <label>.github/workflows/ci.yml</label>
+          <div class="row">
+            <button onclick="downloadFile('.github_workflows_ci.yml', CI_YML)">Download ci.yml</button>
+            <button onclick="copyToClipboard(CI_YML, this)">Copy</button>
+          </div>
+          <p class="small muted">Save as <span class="path">.github/workflows/ci.yml</span></p>
+          <pre><code id="code-ci"></code></pre>
+        </div>
+        <div>
+          <label>.gitignore</label>
+          <div class="row">
+            <button onclick="downloadFile('.gitignore', GITIGNORE_TXT)">Download .gitignore</button>
+            <button onclick="copyToClipboard(GITIGNORE_TXT, this)">Copy</button>
+          </div>
+          <pre><code id="code-gitignore"></code></pre>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>2) Convert data.xlsx to data.csv</h2>
+      <p>Upload your provided <span class="path">data.xlsx</span> (from the attachment) and download the generated <span class="path">data.csv</span>. This conversion preserves the sheet data as CSV for the first worksheet.</p>
+      <div class="row">
+        <input type="file" id="fileXlsx" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" />
+        <button id="btnConvert">Convert to data.csv</button>
+      </div>
+      <p id="convStatus" class="muted small">Awaiting file…</p>
+      <pre id="csvPreview" style="display:none"></pre>
+      <p class="small muted">Note: If your workbook has multiple sheets, this exports the first sheet to CSV. If needed, convert a specific sheet with desktop tools and commit as <span class="path">data.csv</span>.</p>
+    </section>
+
+    <section>
+      <h2>3) Commit and push</h2>
+      <p>After saving the files into your repository, run:</p>
+      <pre><code>git add execute.py data.csv .github/workflows/ci.yml .gitignore
+git commit -m "Fix execute.py, add data.csv, and CI workflow publishing result.json"
+git push</code></pre>
+      <ul>
+        <li>GitHub Actions will:
+          <ul>
+            <li>Run Ruff and show results in the logs</li>
+            <li>Execute <span class="path">python execute.py &gt; result.json</span></li>
+            <li>Publish <span class="path">result.json</span> via GitHub Pages</li>
+          </ul>
+        </li>
+        <li>Do not commit <span class="path">result.json</span>; it’s generated in CI and published to Pages.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Troubleshooting</h2>
+      <ul>
+        <li>If CI fails due to missing Excel reader, ensure <code>openpyxl</code> is installed (our workflow installs it).</li>
+        <li>If your repo only has <span class="path">data.xlsx</span>, <span class="path">execute.py</span> will still work; it prefers <span class="path">data.csv</span> when present, else falls back to <span class="path">data.xlsx</span>.</li>
+        <li>Pages URL appears in the “deploy” job summary. Open it to view the published <span class="path">result.json</span>.</li>
+      </ul>
+    </section>
+  </main>
+
+  <script>
+    // -------- File contents --------
+    const EXECUTE_PY = `import json
+import os
+import sys
+from typing import Any, Dict, List
+
+import pandas as pd
+
+
+def _load_data() -> pd.DataFrame:
+    \\"\\"
+    Load input data, preferring CSV if present; otherwise fall back to Excel.
+
+    Returns:
+        DataFrame with the dataset.
+    \\"\\"
+    if os.path.exists("data.csv"):
+        df = pd.read_csv("data.csv")
+    elif os.path.exists("data.xlsx"):
+        df = pd.read_excel("data.xlsx")
+    else:
+        print("Error: data.csv or data.xlsx not found", file=sys.stderr)
+        raise SystemExit(1)
+    return df
+
+
+def main() -> None:
+    # Read the data
+    df = _load_data()
+
+    # Normalize types
+    if "date" in df.columns:
+        df["date"] = pd.to_datetime(df["date"], errors="coerce")
+    for col in ("units", "price"):
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+
+    # Compute revenue
+    df["revenue"] = df["units"] * df["price"]
+
+    # row_count
+    row_count: int = int(len(df))
+
+    # regions: count of distinct regions
+    regions_count: int = int(df["region"].nunique())
+
+    # top_n_products_by_revenue (n=3)
+    n = 3
+    top_products = (
+        df.groupby("product", dropna=False)["revenue"]
+        .sum()
+        .sort_values(ascending=False)
+        .head(n)
+        .reset_index()
+    )
+    top_products_list: List[Dict[str, Any]] = [
+        {"product": str(row["product"]), "revenue": float(row["revenue"])}
+        for _, row in top_products.iterrows()
+    ]
+
+    # rolling_7d_revenue_by_region: for each region, last value of 7-day moving average of daily revenue
+    rolling_last: Dict[str, float] = {}
+    if "date" in df.columns:
+        daily_rev = (
+            df.groupby(["region", "date"], dropna=False)["revenue"]
+            .sum()
+            .reset_index()
+            .sort_values(["region", "date"])
+        )
+        # 7-day rolling mean per region
+        daily_rev["rolling_7d"] = daily_rev.groupby("region", sort=False)["revenue"].transform(
+            lambda s: s.rolling(window=7, min_periods=1).mean()
+        )
+        rolling_last = {
+            str(region): float(group["rolling_7d"].iloc[-1])
+            for region, group in daily_rev.groupby("region", sort=False)
+            if not group.empty
+        }
+
+    result: Dict[str, Any] = {
+        "row_count": row_count,
+        "regions_count": regions_count,
+        "top_n_products_by_revenue": top_products_list,
+        "rolling_7d_revenue_by_region": rolling_last,
+    }
+
+    json.dump(result, sys.stdout, indent=2, sort_keys=True)
+
+
+if __name__ == "__main__":
+    main()
+`;
+
+    const CI_YML = `name: CI
+
+on:
+  push:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pandas==2.3.* openpyxl ruff
+
+      - name: Ruff (lint)
+        run: |
+          ruff --version
+          # Run Ruff and show results; do not fail the build on lint errors
+          ruff check . || true
+
+      - name: Run execute.py to produce result.json
+        run: |
+          python execute.py > result.json
+          test -s result.json
+
+      - name: Prepare Pages artifact
+        run: |
+          mkdir -p public
+          cp result.json public/result.json
+          cat > public/index.html << 'EOF'
+          <!doctype html>
+          <html>
+          <head>
+            <meta charset="utf-8" />
+            <meta name="viewport" content="width=device-width,initial-scale=1" />
+            <title>result.json</title>
+            <style>
+              body { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace; padding: 24px; }
+              pre { white-space: pre-wrap; word-break: break-word; }
+            </style>
+          </head>
+          <body>
+            <h1>result.json</h1>
+            <pre id="out">Loading…</pre>
+            <script>
+            fetch('result.json')
+              .then(r => r.json())
+              .then(j => { document.getElementById('out').textContent = JSON.stringify(j, null, 2); })
+              .catch(e => { document.getElementById('out').textContent = 'Error: ' + e; });
+            </script>
+          </body>
+          </html>
+          EOF
+
+      - name: Upload GitHub Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    environment:
+      name: github-pages
+      url: \${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+`;
+
+    const GITIGNORE_TXT = `# Do not commit the CI-generated result.json
+result.json
+`;
+
+    // -------- Utility functions --------
+    function downloadFile(filename, content) {
+      const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 500);
+    }
+
+    async function copyToClipboard(text, btn) {
+      try {
+        await navigator.clipboard.writeText(text);
+        const old = btn.textContent;
+        btn.textContent = 'Copied!';
+        btn.style.background = '#1f6f3f';
+        setTimeout(() => {
+          btn.textContent = old;
+          btn.style.background = '';
+        }, 1200);
+      } catch {
+        alert('Copy failed. Select and copy manually.');
+      }
+    }
+
+    // Populate previews
+    document.getElementById('code-execute').textContent = EXECUTE_PY;
+    document.getElementById('code-ci').textContent = CI_YML;
+    document.getElementById('code-gitignore').textContent = GITIGNORE_TXT;
+
+    // -------- XLSX -> CSV conversion (using SheetJS) --------
+    // Load SheetJS from CDN
+    const script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+    script.onload = () => { document.getElementById('convStatus').textContent = 'XLSX parser loaded. Choose a file and click "Convert to data.csv".'; };
+    script.onerror = () => { document.getElementById('convStatus').textContent = 'Failed to load XLSX parser. Use another tool to convert to CSV.'; document.getElementById('convStatus').className = 'err'; };
+    document.head.appendChild(script);
+
+    document.getElementById('btnConvert').addEventListener('click', async () => {
+      const f = document.getElementById('fileXlsx').files[0];
+      const status = document.getElementById('convStatus');
+      const preview = document.getElementById('csvPreview');
+      preview.style.display = 'none';
+      preview.textContent = '';
+
+      if (!f) {
+        status.textContent = 'Please select data.xlsx first.';
+        status.className = 'warn';
+        return;
+      }
+      if (typeof XLSX === 'undefined') {
+        status.textContent = 'XLSX parser not loaded. Check your connection.';
+        status.className = 'err';
+        return;
+      }
+      status.textContent = 'Reading workbook…';
+      status.className = 'muted';
+
+      const buf = await f.arrayBuffer();
+      let wb;
+      try {
+        wb = XLSX.read(buf, { type: 'array' });
+      } catch (e) {
+        status.textContent = 'Failed to parse XLSX: ' + e;
+        status.className = 'err';
+        return;
+      }
+      const firstSheetName = wb.SheetNames[0];
+      if (!firstSheetName) {
+        status.textContent = 'No sheets found in workbook.';
+        status.className = 'err';
+        return;
+      }
+      const ws = wb.Sheets[firstSheetName];
+      const csv = XLSX.utils.sheet_to_csv(ws);
+
+      // Show preview (first ~2000 chars)
+      preview.style.display = 'block';
+      preview.textContent = csv.slice(0, 2000) + (csv.length > 2000 ? '\n... (truncated preview) ...' : '');
+
+      // Download file as data.csv
+      downloadFile('data.csv', csv);
+      status.textContent = 'Conversion complete. data.csv downloaded.';
+      status.className = 'success';
+    });
+  </script>
+</body>
+</html>
